@@ -1,0 +1,14 @@
+---
+- name: Get last line of nodejs log
+  hosts: all
+  gather_facts: no
+
+  tasks:
+    - name: Read last line of nodejs.log
+      shell: tail -n 1 /var/log/arcadia/nodejs/nodejs.log
+      register: last_log_line
+      ignore_errors: yes
+
+    - name: Show last log line
+      debug:
+        msg: "{{ last_log_line.stdout | default('No log line found or file missing') }}"
