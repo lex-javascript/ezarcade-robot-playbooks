@@ -1,0 +1,54 @@
+---
+- name: Delete user and back up home directory
+  hosts: all
+  become: true
+
+  vars:
+    backup_dir: "/root/user_backups"
+
+  tasks:
+    - name: Ensure backup directory exists
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Check if user home directory exists
+      ansible.builtin.stat:
+        path: "/home/{{ del_username }}"
+      register: user_home_stat
+
+    - name: Archive (tar) user's home directory before deleting
+      ansible.builtin.archive:
+        path: "/home/{{ del_username }}"
+        dest: "{{ backup_dir }}/{{ del_username }}_home_backup_{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
+        format: gz
+      when: user_home_stat.stat.exists
+
+    - name: Delete the user and remove home directory
+      ansible.builtin.user:
+        name: "{{ del_username }}"
+        state: absent
+        remove: yes
+
+    - name: Remove sudoers file for user
+      ansible.builtin.file:
+        path: "/etc/sudoers.d/{{ del_username }}"
+        state: absent
+
+    - name: Remove Match User line if exists
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^Match User {{ del_username }}"
+        state: absent
+
+    - name: Remove ANSIBLE MANAGED BLOCK for user
+      ansible.builtin.blockinfile:
+        path: /etc/ssh/sshd_config
+        marker: "# {mark} ANSIBLE MANAGED BLOCK for {{ del_username }}"
+        state: absent
+
+    - name: Restart SSH service
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
