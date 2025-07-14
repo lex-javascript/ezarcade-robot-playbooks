@@ -1,0 +1,84 @@
+---
+- name: Create user with SSH key and disable password login
+  hosts: all
+  become: true
+
+  vars:
+    ssh_key_bits: 2048
+
+  tasks:
+    - name: Create the user
+      ansible.builtin.user:
+        name: "{{ new_username }}"
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Create .ssh directory
+      ansible.builtin.file:
+        path: "/home/{{ new_username }}/.ssh"
+        state: directory
+        owner: "{{ new_username }}"
+        group: "{{ new_username }}"
+        mode: "0700"
+
+    - name: Generate SSH key pair on the control node
+      community.crypto.openssh_keypair:
+        path: "/tmp/{{ new_username }}_id_rsa"
+        size: "{{ ssh_key_bits }}"
+        type: rsa
+      delegate_to: localhost
+      run_once: true
+
+    - name: Copy public key to remote authorized_keys
+      ansible.builtin.copy:
+        src: "/tmp/{{ new_username }}_id_rsa.pub"
+        dest: "/home/{{ new_username }}/.ssh/authorized_keys"
+        owner: "{{ new_username }}"
+        group: "{{ new_username }}"
+        mode: "0600"
+
+    - name: Read private key contents
+      ansible.builtin.slurp:
+        src: "/tmp/{{ new_username }}_id_rsa"
+      delegate_to: localhost
+      register: private_key_file
+      run_once: true
+
+    - name: Show private key (save this carefully!)
+      ansible.builtin.debug:
+        msg: "{{ private_key_file.content | b64decode }}"
+      run_once: true
+
+    - name: Remove temporary private key file
+      ansible.builtin.file:
+        path: "/tmp/{{ new_username }}_id_rsa"
+        state: absent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Remove temporary public key file
+      ansible.builtin.file:
+        path: "/tmp/{{ new_username }}_id_rsa.pub"
+        state: absent
+      delegate_to: localhost
+      run_once: true
+
+    - name: Ensure password authentication is disabled for the new user
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^Match User {{ new_username }}"
+        line: "Match User {{ new_username }}"
+        state: present
+
+    - name: Add lines to disable password authentication
+      ansible.builtin.blockinfile:
+        path: /etc/ssh/sshd_config
+        block: |
+          Match User {{ new_username }}
+              PasswordAuthentication no
+        marker: "# {mark} ANSIBLE MANAGED BLOCK for {{ new_username }}"
+
+    - name: Restart SSH service
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
