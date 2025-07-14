@@ -48,20 +48,6 @@
       ansible.builtin.debug:
         msg: "{{ private_key_file.content | b64decode }}"
 
-    - name: Remove temporary private key file
-      delegate_to: localhost
-      run_once: true
-      ansible.builtin.file:
-        path: "/tmp/{{ new_username }}_id_rsa"
-        state: absent
-
-    - name: Remove temporary public key file
-      delegate_to: localhost
-      run_once: true
-      ansible.builtin.file:
-        path: "/tmp/{{ new_username }}_id_rsa.pub"
-        state: absent
-
     - name: Grant sudo permissions via sudoers file if requested
       ansible.builtin.copy:
         dest: "/etc/sudoers.d/{{ new_username }}"
