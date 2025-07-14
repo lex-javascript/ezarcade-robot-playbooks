@@ -25,6 +25,7 @@
     - name: Generate SSH key pair on control node (localhost)
       delegate_to: localhost
       run_once: true
+      become: false
       command: >
         ssh-keygen -t rsa -b {{ ssh_key_bits }} -f /tmp/{{ new_username }}_id_rsa -N ''
 
@@ -39,12 +40,14 @@
     - name: Read private key contents
       delegate_to: localhost
       run_once: true
+      become: false
       ansible.builtin.slurp:
         src: "/tmp/{{ new_username }}_id_rsa"
       register: private_key_file
 
     - name: Show private key (save this carefully!)
       run_once: true
+      become: false
       ansible.builtin.debug:
         msg: "{{ private_key_file.content | b64decode }}"
 
