@@ -22,13 +22,13 @@
         group: "{{ new_username }}"
         mode: "0700"
 
-    - name: Generate SSH key pair on the control node
-      community.crypto.openssh_keypair:
-        path: "/tmp/{{ new_username }}_id_rsa"
-        size: "{{ ssh_key_bits }}"
-        type: rsa
+    - name: Generate SSH key pair on control node (localhost)
       delegate_to: localhost
       run_once: true
+      command: >
+        ssh-keygen -t rsa -b {{ ssh_key_bits }} -f /tmp/{{ new_username }}_id_rsa -N ''
+      args:
+        creates: "/tmp/{{ new_username }}_id_rsa"
 
     - name: Copy public key to remote authorized_keys
       ansible.builtin.copy:
@@ -39,36 +39,36 @@
         mode: "0600"
 
     - name: Read private key contents
+      delegate_to: localhost
+      run_once: true
       ansible.builtin.slurp:
         src: "/tmp/{{ new_username }}_id_rsa"
-      delegate_to: localhost
       register: private_key_file
-      run_once: true
 
     - name: Show private key (save this carefully!)
+      run_once: true
       ansible.builtin.debug:
         msg: "{{ private_key_file.content | b64decode }}"
-      run_once: true
 
     - name: Remove temporary private key file
+      delegate_to: localhost
+      run_once: true
       ansible.builtin.file:
         path: "/tmp/{{ new_username }}_id_rsa"
         state: absent
-      delegate_to: localhost
-      run_once: true
 
     - name: Remove temporary public key file
+      delegate_to: localhost
+      run_once: true
       ansible.builtin.file:
         path: "/tmp/{{ new_username }}_id_rsa.pub"
         state: absent
-      delegate_to: localhost
-      run_once: true
 
     - name: Grant sudo permissions via sudoers file if requested
       ansible.builtin.copy:
         dest: "/etc/sudoers.d/{{ new_username }}"
         content: "{{ new_username }} ALL=(ALL) NOPASSWD: ALL"
-        mode: '0440'
+        mode: "0440"
       when: grant_sudo | bool
 
     - name: Remove sudoers file if sudo access not granted (cleanup)
