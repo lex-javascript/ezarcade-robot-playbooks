@@ -1,5 +1,5 @@
 ---
-- name: Delete user and back up home directory
+- name: Delete user and always back up home directory (with timestamp)
   hosts: all
   become: true
 
@@ -18,12 +18,17 @@
         path: "/home/{{ del_username }}"
       register: user_home_stat
 
-    - name: Archive (tar) user's home directory before deleting
+    - name: Archive user's home directory if it exists
       ansible.builtin.archive:
         path: "/home/{{ del_username }}"
         dest: "{{ backup_dir }}/{{ del_username }}_home_backup_{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
         format: gz
       when: user_home_stat.stat.exists
+
+    - name: Warn if home directory does not exist (still proceed)
+      ansible.builtin.debug:
+        msg: "Home directory for user {{ del_username }} does not exist. Skipping backup."
+      when: not user_home_stat.stat.exists
 
     - name: Delete the user and remove home directory
       ansible.builtin.user:
