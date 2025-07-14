@@ -19,10 +19,9 @@
       register: user_home_stat
 
     - name: Archive user's home directory if it exists
-      ansible.builtin.archive:
-        path: "/home/{{ del_username }}"
-        dest: "{{ backup_dir }}/{{ del_username }}_home_backup_{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
-        format: gz
+      ansible.builtin.shell: >
+        tar czf {{ backup_dir }}/{{ del_username }}_home_backup_{{ ansible_date_time.iso8601_basic_short }}.tar.gz
+        -C /home {{ del_username }}
       when: user_home_stat.stat.exists
 
     - name: Warn if home directory does not exist (still proceed)
